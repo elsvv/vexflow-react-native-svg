@@ -3,10 +3,12 @@
  *
  * VexFlow uses canvas.getContext('2d').measureText() for text measurement,
  * which doesn't exist in React Native. This module provides a mock canvas
- * that approximates text measurements based on font metrics.
+ * that uses pre-computed glyph metrics from Bravura font metadata for accurate
+ * measurement of SMuFL music glyphs.
  */
 
 import { Element as VexFlowElement } from 'vexflow';
+import { SMUFL_GLYPH_ADVANCE_WIDTHS } from './smuflGlyphWidths';
 
 /**
  * Font metrics for common VexFlow fonts.
@@ -18,24 +20,42 @@ const FONT_METRICS: Record<
         avgCharWidth: number; // Average character width as ratio of font size
         ascent: number; // Ascent as ratio of font size
         descent: number; // Descent as ratio of font size
+        isMusicFont: boolean; // Whether this is a SMuFL music font
     }
 > = {
-    // Music fonts (SMuFL) - these have very different metrics
-    bravura: { avgCharWidth: 1.0, ascent: 0.8, descent: 0.2 },
-    petaluma: { avgCharWidth: 1.0, ascent: 0.8, descent: 0.2 },
-    gonville: { avgCharWidth: 1.0, ascent: 0.8, descent: 0.2 },
-    leland: { avgCharWidth: 1.0, ascent: 0.8, descent: 0.2 },
+    // Music fonts (SMuFL) - use glyph-specific metrics
+    bravura: { avgCharWidth: 0.25, ascent: 0.8, descent: 0.2, isMusicFont: true },
+    petaluma: { avgCharWidth: 0.25, ascent: 0.8, descent: 0.2, isMusicFont: true },
+    gonville: { avgCharWidth: 0.25, ascent: 0.8, descent: 0.2, isMusicFont: true },
+    leland: { avgCharWidth: 0.25, ascent: 0.8, descent: 0.2, isMusicFont: true },
 
     // Text fonts
-    academico: { avgCharWidth: 0.55, ascent: 0.8, descent: 0.2 },
-    arial: { avgCharWidth: 0.52, ascent: 0.76, descent: 0.24 },
-    'times new roman': { avgCharWidth: 0.48, ascent: 0.78, descent: 0.22 },
-    serif: { avgCharWidth: 0.5, ascent: 0.78, descent: 0.22 },
-    'sans-serif': { avgCharWidth: 0.52, ascent: 0.76, descent: 0.24 },
+    academico: { avgCharWidth: 0.55, ascent: 0.8, descent: 0.2, isMusicFont: false },
+    arial: { avgCharWidth: 0.52, ascent: 0.76, descent: 0.24, isMusicFont: false },
+    'times new roman': { avgCharWidth: 0.48, ascent: 0.78, descent: 0.22, isMusicFont: false },
+    serif: { avgCharWidth: 0.5, ascent: 0.78, descent: 0.22, isMusicFont: false },
+    'sans-serif': { avgCharWidth: 0.52, ascent: 0.76, descent: 0.24, isMusicFont: false },
 
     // Default fallback
-    default: { avgCharWidth: 0.55, ascent: 0.8, descent: 0.2 },
+    default: { avgCharWidth: 0.55, ascent: 0.8, descent: 0.2, isMusicFont: false },
 };
+
+/**
+ * Check if a character is in the SMuFL Private Use Area (U+E000-U+F8FF).
+ */
+function isSmuflGlyph(char: string): boolean {
+    const code = char.charCodeAt(0);
+    return code >= 0xe000 && code <= 0xf8ff;
+}
+
+/**
+ * Get the advance width for a SMuFL glyph character.
+ * Returns the width in staff spaces (1 em = 4 staff spaces in SMuFL).
+ * Returns undefined if the glyph is not found in the lookup table.
+ */
+function getSmuflGlyphWidth(char: string): number | undefined {
+    return SMUFL_GLYPH_ADVANCE_WIDTHS[char];
+}
 
 /**
  * Get font metrics for a given font family.
@@ -43,6 +63,43 @@ const FONT_METRICS: Record<
 function getFontMetrics(fontFamily: string) {
     const normalizedFamily = fontFamily.toLowerCase().split(',')[0].trim();
     return FONT_METRICS[normalizedFamily] ?? FONT_METRICS['default'];
+}
+
+/**
+ * Check if a font family is a music font (SMuFL-compliant).
+ */
+function isMusicFont(fontFamily: string): boolean {
+    const metrics = getFontMetrics(fontFamily);
+    return metrics.isMusicFont;
+}
+
+/**
+ * Measure text width using SMuFL glyph metrics for music fonts.
+ * For SMuFL fonts, each glyph has a specific advance width in staff spaces.
+ * The conversion is: width_in_pixels = advance_width * (font_size / 4)
+ * This is because in SMuFL, 1 em = 4 staff spaces.
+ */
+function measureSmuflText(text: string, fontSizeInPixels: number): number {
+    let totalWidth = 0;
+
+    for (const char of text) {
+        if (isSmuflGlyph(char)) {
+            const glyphWidth = getSmuflGlyphWidth(char);
+            if (glyphWidth !== undefined) {
+                // Convert from staff spaces to pixels
+                // In SMuFL: 1 em = 4 staff spaces, so width = advance * (fontSize / 4)
+                totalWidth += glyphWidth * (fontSizeInPixels / 4);
+            } else {
+                // Fallback for unknown SMuFL glyphs - use average width
+                totalWidth += 0.25 * fontSizeInPixels;
+            }
+        } else {
+            // Non-SMuFL character - use text font metrics
+            totalWidth += 0.55 * fontSizeInPixels;
+        }
+    }
+
+    return totalWidth;
 }
 
 /**
@@ -121,7 +178,17 @@ class MockCanvasContext {
         const fontFamily = parseFontFamily(this.font);
         const metrics = getFontMetrics(fontFamily);
 
-        const width = text.length * fontSize * metrics.avgCharWidth;
+        let width: number;
+
+        // Check if this is a music font and text contains SMuFL glyphs
+        if (metrics.isMusicFont && text.length > 0 && isSmuflGlyph(text[0])) {
+            // Use precise SMuFL glyph measurements
+            width = measureSmuflText(text, fontSize);
+        } else {
+            // Use character count approximation for text fonts
+            width = text.length * fontSize * metrics.avgCharWidth;
+        }
+
         const ascent = fontSize * metrics.ascent;
         const descent = fontSize * metrics.descent;
 

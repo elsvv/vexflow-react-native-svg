@@ -34,3 +34,18 @@ export type {
     SVGPressHandler,
     ElementInfo,
 } from './types';
+
+export {
+    VEXFLOW_FONT_SOURCES,
+    RECOMMENDED_FONT_COMBINATIONS,
+    getFontFiles,
+    getMusicFontFiles,
+    getTextFontFiles,
+    getAvailableFontFamilies,
+    getFontMetadataUrl,
+    getAllFontUrls,
+    getEssentialFonts,
+    generateDownloadScript,
+    printFontInfo,
+} from './fontDownloader';
+export type { FontFile, FontFamily } from './fontDownloader';
