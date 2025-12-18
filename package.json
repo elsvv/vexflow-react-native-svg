@@ -1,6 +1,6 @@
 {
-    "name": "@eliseev_s/vexflow-react-native-svg",
-    "version": "1.0.0",
+    "name": "vexflow-react-native-svg",
+    "version": "1.0.2",
     "description": "React Native SVG rendering backend for VexFlow - render music notation in React Native apps",
     "main": "lib/index.js",
     "module": "lib/index.js",

@@ -9,83 +9,93 @@ import React, { useMemo, useCallback, ReactElement } from 'react';
 import { GestureResponderEvent } from 'react-native';
 import Svg, { G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { ReactNativeSVGContext } from './ReactNativeSVGContext';
+import { initializeTextMeasurement } from './textMeasurement';
 import type { SVGElementNode, VexFlowScoreProps, SVGAttributes, InteractiveProps } from './types';
+
+// Initialize text measurement on module load
+initializeTextMeasurement();
 
 /**
  * Convert SVGElementNode tree to React Native SVG elements.
  */
 function renderElementTree(
-  node: SVGElementNode,
-  elementStyles?: Record<string, Partial<SVGAttributes>>,
-  classStyles?: Record<string, Partial<SVGAttributes>>,
-  onElementPress?: (elementId: string | undefined, className: string | undefined, event: GestureResponderEvent) => void
+    node: SVGElementNode,
+    elementStyles?: Record<string, Partial<SVGAttributes>>,
+    classStyles?: Record<string, Partial<SVGAttributes>>,
+    onElementPress?: (
+        elementId: string | undefined,
+        className: string | undefined,
+        event: GestureResponderEvent
+    ) => void
 ): ReactElement {
-  // Apply style overrides
-  let props = { ...node.props };
+    // Apply style overrides
+    let props = { ...node.props };
 
-  // Apply class-based styles
-  if (classStyles && node.className) {
-    const classStyle = classStyles[node.className];
-    if (classStyle) {
-      props = { ...props, ...convertAttributesToProps(classStyle) };
+    // Apply class-based styles
+    if (classStyles && node.className) {
+        const classStyle = classStyles[node.className];
+        if (classStyle) {
+            props = { ...props, ...convertAttributesToProps(classStyle) };
+        }
     }
-  }
 
-  // Apply ID-based styles (higher priority)
-  if (elementStyles && node.id) {
-    const idStyle = elementStyles[node.id];
-    if (idStyle) {
-      props = { ...props, ...convertAttributesToProps(idStyle) };
+    // Apply ID-based styles (higher priority)
+    if (elementStyles && node.id) {
+        const idStyle = elementStyles[node.id];
+        if (idStyle) {
+            props = { ...props, ...convertAttributesToProps(idStyle) };
+        }
     }
-  }
 
-  // Add press handler if provided
-  if (onElementPress && (node.id || node.className)) {
-    props.onPress = (event: GestureResponderEvent) => {
-      onElementPress(node.id, node.className, event);
-    };
-  }
+    // Add press handler if provided
+    if (onElementPress && (node.id || node.className)) {
+        props.onPress = (event: GestureResponderEvent) => {
+            onElementPress(node.id, node.className, event);
+        };
+    }
 
-  // Render children recursively
-  const children = node.children.map((child) => renderElementTree(child, elementStyles, classStyles, onElementPress));
+    // Render children recursively
+    const children = node.children.map((child) =>
+        renderElementTree(child, elementStyles, classStyles, onElementPress)
+    );
 
-  switch (node.type) {
-    case 'svg':
-      return React.createElement(Svg, props, children);
-    case 'g':
-      return React.createElement(G, props, children);
-    case 'path':
-      return React.createElement(Path, props, children);
-    case 'rect':
-      return React.createElement(Rect, props, children);
-    case 'text':
-      return React.createElement(SvgText, props, node.textContent);
-    default:
-      return React.createElement(G, props, children);
-  }
+    switch (node.type) {
+        case 'svg':
+            return React.createElement(Svg, props, children);
+        case 'g':
+            return React.createElement(G, props, children);
+        case 'path':
+            return React.createElement(Path, props, children);
+        case 'rect':
+            return React.createElement(Rect, props, children);
+        case 'text':
+            return React.createElement(SvgText, props, node.textContent);
+        default:
+            return React.createElement(G, props, children);
+    }
 }
 
 /**
  * Convert SVG attribute names to react-native-svg prop names.
  */
 function convertAttributesToProps(attrs: Partial<SVGAttributes>): Record<string, any> {
-  const propMap: Record<string, string> = {
-    'font-family': 'fontFamily',
-    'font-size': 'fontSize',
-    'font-weight': 'fontWeight',
-    'font-style': 'fontStyle',
-    'stroke-width': 'strokeWidth',
-    'stroke-dasharray': 'strokeDasharray',
-    'stroke-linecap': 'strokeLinecap',
-    'pointer-events': 'pointerEvents',
-  };
+    const propMap: Record<string, string> = {
+        'font-family': 'fontFamily',
+        'font-size': 'fontSize',
+        'font-weight': 'fontWeight',
+        'font-style': 'fontStyle',
+        'stroke-width': 'strokeWidth',
+        'stroke-dasharray': 'strokeDasharray',
+        'stroke-linecap': 'strokeLinecap',
+        'pointer-events': 'pointerEvents',
+    };
 
-  const result: Record<string, any> = {};
-  for (const [key, value] of Object.entries(attrs)) {
-    const propName = propMap[key] ?? key;
-    result[propName] = value;
-  }
-  return result;
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(attrs)) {
+        const propName = propMap[key] ?? key;
+        result[propName] = value;
+    }
+    return result;
 }
 
 /**
@@ -124,27 +134,27 @@ function convertAttributesToProps(attrs: Partial<SVGAttributes>): Record<string,
  * ```
  */
 export function VexFlowScore({
-  width,
-  height,
-  onDraw,
-  onElementPress,
-  elementStyles,
-  classStyles,
-  ...svgProps
+    width,
+    height,
+    onDraw,
+    onElementPress,
+    elementStyles,
+    classStyles,
+    ...svgProps
 }: VexFlowScoreProps): ReactElement {
-  // Create context and render the score
-  const svgTree = useMemo(() => {
-    const context = new ReactNativeSVGContext({ width, height });
-    onDraw(context);
-    return context.getSVG();
-  }, [width, height, onDraw]);
+    // Create context and render the score
+    const svgTree = useMemo(() => {
+        const context = new ReactNativeSVGContext({ width, height });
+        onDraw(context);
+        return context.getSVG();
+    }, [width, height, onDraw]);
 
-  // Convert the virtual SVG tree to React elements
-  const element = useMemo(() => {
-    return renderElementTree(svgTree, elementStyles, classStyles, onElementPress);
-  }, [svgTree, elementStyles, classStyles, onElementPress]);
+    // Convert the virtual SVG tree to React elements
+    const element = useMemo(() => {
+        return renderElementTree(svgTree, elementStyles, classStyles, onElementPress);
+    }, [svgTree, elementStyles, classStyles, onElementPress]);
 
-  return element;
+    return element;
 }
 
 /**
@@ -167,50 +177,55 @@ export function VexFlowScore({
  * ```
  */
 export function useVexFlowContext(
-  width: number,
-  height: number,
-  options?: {
-    elementStyles?: Record<string, Partial<SVGAttributes>>;
-    classStyles?: Record<string, Partial<SVGAttributes>>;
-    onElementPress?: (
-      elementId: string | undefined,
-      className: string | undefined,
-      event: GestureResponderEvent
-    ) => void;
-  }
+    width: number,
+    height: number,
+    options?: {
+        elementStyles?: Record<string, Partial<SVGAttributes>>;
+        classStyles?: Record<string, Partial<SVGAttributes>>;
+        onElementPress?: (
+            elementId: string | undefined,
+            className: string | undefined,
+            event: GestureResponderEvent
+        ) => void;
+    }
 ) {
-  const context = useMemo(() => {
-    return new ReactNativeSVGContext({ width, height });
-  }, [width, height]);
+    const context = useMemo(() => {
+        return new ReactNativeSVGContext({ width, height });
+    }, [width, height]);
 
-  const clear = useCallback(() => {
-    context.clear();
-  }, [context]);
+    const clear = useCallback(() => {
+        context.clear();
+    }, [context]);
 
-  const render = useCallback(() => {
-    const svgTree = context.getSVG();
-    return renderElementTree(svgTree, options?.elementStyles, options?.classStyles, options?.onElementPress);
-  }, [context, options?.elementStyles, options?.classStyles, options?.onElementPress]);
+    const render = useCallback(() => {
+        const svgTree = context.getSVG();
+        return renderElementTree(
+            svgTree,
+            options?.elementStyles,
+            options?.classStyles,
+            options?.onElementPress
+        );
+    }, [context, options?.elementStyles, options?.classStyles, options?.onElementPress]);
 
-  const getElementById = useCallback(
-    (id: string) => {
-      return context.getElementRegistry().get(id);
-    },
-    [context]
-  );
+    const getElementById = useCallback(
+        (id: string) => {
+            return context.getElementRegistry().get(id);
+        },
+        [context]
+    );
 
-  const getElementsByClassName = useCallback(
-    (className: string) => {
-      return context.getElementsByClassName(className);
-    },
-    [context]
-  );
+    const getElementsByClassName = useCallback(
+        (className: string) => {
+            return context.getElementsByClassName(className);
+        },
+        [context]
+    );
 
-  return {
-    context,
-    render,
-    clear,
-    getElementById,
-    getElementsByClassName,
-  };
+    return {
+        context,
+        render,
+        clear,
+        getElementById,
+        getElementsByClassName,
+    };
 }
